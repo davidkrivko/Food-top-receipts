@@ -10,14 +10,12 @@ from restaurants.views import (
 
 
 router = DefaultRouter()
-router.register("dishes", DishModelViewSet)
-router.register("restaurants", RestaurantModelViewSet)
-router.register("printers", PrinterModelViewSet)
-router.register("orders", OrderModelViewSet)
+router.register(r"dishes", DishModelViewSet)
+router.register(r"restaurants", RestaurantModelViewSet)
+router.register(r"printers", PrinterModelViewSet)
+router.register(r"orders", OrderModelViewSet)
 
 
-urlpatterns = [
-    path("", include(router.urls))
-]
+urlpatterns = [path("", include(router.urls))]
 
 app_name = "restaurants"
