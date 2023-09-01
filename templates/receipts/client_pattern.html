@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <style>
+    table {
+      border-collapse: collapse;
+      width: 50%;
+    }
+
+    th, td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+  </style>
+  <title></title>
+</head>
+  <body>
+    <h2>Kitchen receipt</h2>
+
+    <h4>Order #{{ order_number }}</h4>
+    <table>
+        <thead>
+            <tr>
+                <th>Dish</th>
+                <th>Quantity</th>
+                <th>Price</th>
+                <th>Subtotal</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for dish_order in order_dishes %}
+            <tr>
+                <td>{{ dish_order.dish.name }}</td>
+                <td>{{ dish_order.quantity }}</td>
+                <td>{{ dish_order.dish.price }}</td>
+                <td>{{ dish_order.amount }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <p><strong>Total: ${{ total }}</strong></p>
+
+  </body>
+</html>
