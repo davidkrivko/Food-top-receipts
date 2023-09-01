@@ -73,8 +73,10 @@ class ReceiptModel(models.Model):
         (1, "kitchen"),
     )
     STATUS_CHOICES = (
+        (-1, "Error"),
         (0, "Not Generated"),
         (1, "Generated"),
+        (2, "Printed"),
     )
 
     type = models.SmallIntegerField(
@@ -91,6 +93,12 @@ class ReceiptModel(models.Model):
         "OrderModel",
         on_delete=models.CASCADE,
         related_name="receipts",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    printer = models.ForeignKey(
+        "PrinterModel",
+        on_delete=models.SET_NULL,
+        related_name="receipts"
     )
 
     class Meta:

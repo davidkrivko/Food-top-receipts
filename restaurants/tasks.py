@@ -4,6 +4,7 @@ import os
 
 import requests
 from django.conf import settings
+from django.db import transaction
 from django.template.loader import render_to_string
 
 from receipts_service.celery import app
@@ -16,43 +17,54 @@ def generate_receipts_for_order(order_id):
     try:
         order = OrderModel.objects.get(pk=order_id)
     except OrderModel.DoesNotExist:
-        return f"Order with ID {order_id} does not exist."
+        raise Exception(f"Order with ID {order_id} does not exist.")
 
     # Check if receipts for this order have already been created
     if ReceiptModel.objects.filter(order=order).exists():
-        return f"Receipts for order {order_id} have already been generated."
+        raise Exception(f"Receipts for order {order_id} have already been generated.")
 
     printers = PrinterModel.objects.filter(restaurant=order.restaurant)
     if not printers.exists():
-        return f"No printers available for the restaurant of order {order_id}."
+        raise Exception(f"No printers available for the restaurant of order {order_id}.")
 
-    receipt_types = [0, 1]
-    for r_type in receipt_types:
-        receipt = ReceiptModel.objects.create(type=r_type, order=order)
-        generate_receipt_pdf.delay(receipt.id)
+    receipts_to_create = []
+
+    # Prepare the data for bulk creation
+    for r_type in [0, 1]:
+        for printer in printers:
+            receipts_to_create.append(ReceiptModel(type=r_type, order=order, printer=printer))
+
+    with transaction.atomic():
+        created_receipts = ReceiptModel.objects.bulk_create(receipts_to_create)
+
+    # Trigger the asynchronous tasks
+    for receipt in created_receipts:
+        generate_receipt_pdf.delay(receipt.order.id, receipt.type)
 
 
 @app.task
-def generate_receipt_pdf(receipt_id):
+def generate_receipt_pdf(order_id: int, r_type: int):
     try:
-        receipt_instance = ReceiptModel.objects.get(pk=receipt_id)
+        receipt_instance = ReceiptModel.objects.get(order_id=order_id, type=r_type)
     except ReceiptModel.DoesNotExist:
-        return f"Receipt with ID {receipt_id} does not exist."
+        raise Exception(f"Receipt for order ID {order_id} does not exist.")
 
-    url = "http://localhost:32768/"
+    url = "http://localhost:32769/"
 
-    if receipt_instance.type == 0:
+    if r_type == 0:
         context = {
             "order_dishes": receipt_instance.order.order_dishes.all(),
             "order_number": receipt_instance.order.id,
             "total": receipt_instance.order.total,
             "restaurant": receipt_instance.order.restaurant,
+            "created": receipt_instance.order.created_at,
         }
         html_content = render_to_string("receipts/client_pattern.html", context)
     else:
         context = {
             "order_dishes": receipt_instance.order.order_dishes.all(),
             "order_number": receipt_instance.order.id,
+            "created": receipt_instance.order.created_at,
         }
         html_content = render_to_string("receipts/kitchen_pattern.html", context)
 
@@ -64,7 +76,7 @@ def generate_receipt_pdf(receipt_id):
     headers = {
         "Content-Type": "application/json",
     }
-    output_pdf_path = get_pdf_file_path(receipt_instance, "")
+    output_pdf_path = get_pdf_file_path(receipt_instance)
     absolute_output_path = os.path.join(settings.MEDIA_ROOT, output_pdf_path)
 
     try:
@@ -72,8 +84,11 @@ def generate_receipt_pdf(receipt_id):
         response.raise_for_status()
         with open(absolute_output_path, "wb") as f:
             f.write(response.content)
-        receipt_instance.pdf_file = output_pdf_path
-        receipt_instance.save()
-        return True
     except requests.RequestException as e:
         raise Exception(f"Error occurred while generating PDF: {e}")
+
+    receipt_instance.pdf_file = output_pdf_path
+    receipt_instance.status = 1
+    receipt_instance.save()
+
+    return True

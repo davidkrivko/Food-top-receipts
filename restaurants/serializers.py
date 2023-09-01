@@ -6,6 +6,7 @@ from restaurants.models import (
     PrinterModel,
     DishOrderModel,
     OrderModel,
+    ReceiptModel,
 )
 
 
@@ -53,6 +54,18 @@ class DishOrderSerializer(serializers.ModelSerializer):
         fields = ("dish", "quantity")
 
 
+class ReceiptModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReceiptModel
+        fields = ("id", "type", "status", "created_at")
+
+
+class ReceiptRetrieveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReceiptModel
+        fields = ("id", "created", "type", "status", "pdf_file", "order")
+
+
 class OrderModelSerializer(serializers.ModelSerializer):
     dishes = DishOrderSerializer(many=True, source="order_dishes")
 
@@ -79,18 +92,20 @@ class OrderModelSerializer(serializers.ModelSerializer):
 class OrderListSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderModel
-        fields = ("id", "type", "status", "total")
+        fields = ("id", "created_at", "total")
 
 
 class OrderRetrieveSerializer(serializers.ModelSerializer):
     restaurant = RestaurantAddressSerializer()
+    dishes = DishModelSerializer(many=True)
+    receipts = ReceiptModelSerializer(many=True)
 
     class Meta:
         model = OrderModel
         fields = (
             "id",
-            "dishes",
             "total",
+            "dishes",
             "created_at",
             "restaurant",
             "receipts",
